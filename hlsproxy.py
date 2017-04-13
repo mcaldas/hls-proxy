@@ -98,6 +98,7 @@ class HlsPlaylist:
         if len(lines) == 0:
             self.errors.append("Empty playlist")
             return
+        print lines
         if lines[0] != "#EXTM3U":
             self.errors.append("no #EXTM3U tag at the start of playlist")
             return
@@ -340,8 +341,16 @@ class HlsProxy:
             self.outDir = outDir + '/'
 
     def run(self, hlsPlaylist):
+        global token
         self.finished = defer.Deferred()
-        self.srvPlaylistUrl = hlsPlaylist
+        try:
+            token = token
+        except Exception as e:
+            token = hlsPlaylist.split('?')[-1]
+        print '-------------------------------'
+        print token
+        print '-------------------------------'
+        self.srvPlaylistUrl = hlsPlaylist.replace('null=0', token)
         self.refreshPlaylist()
         return self.finished
 
@@ -430,11 +439,11 @@ class HlsProxy:
             subOutDir = self.outDir + str(variant.bandwidth)
             print "Starting a sub hls-proxy for channel with bandwith ", variant.bandwidth, " in directory ", subOutDir
             make_p(subOutDir)
-            
+
             masterVariant = copy.deepcopy(variant)
             masterPlaylist.variants.append(masterVariant)
             masterVariant.absoluteUrl = str(variant.bandwidth) + "/stream.m3u8"
-            
+
             self.start_subproxy(subOutDir, variant.absoluteUrl)
 
         for imedia, media in enumerate(playlist.medias):
@@ -444,17 +453,17 @@ class HlsProxy:
             subOutDir = os.path.join(self.outDir, relativePath)
             print "Starting a sub hls-proxy for channel with bandwith ", media.type, " in directory ", subOutDir
             make_p(subOutDir)
-            
+
             proxiedMedia = copy.deepcopy(media)
             masterPlaylist.medias.append(proxiedMedia)
             proxiedMedia.absoluteUrl = os.path.join(relativePath, "stream.m3u8")
-            
+
             if media.relativeUrl:
                 # EXT-X-MEDIA URI is optional so it's possible to have a media wihtout relativeUrl
                 self.start_subproxy(subOutDir, media.absoluteUrl)
 
         self.writeFile(self.getClientPlaylist(), masterPlaylist.toStr())
-        
+
     def start_subproxy(self, subOutDir, hlsUrl):
         subProxy = HlsProxy(self.reactor)
         subProxy.verbose = self.verbose
